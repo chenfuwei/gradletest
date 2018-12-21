@@ -1,0 +1,9 @@
+ext{
+    test = 1
+    my = 2
+}
+
+task testExt<<{
+    print "testExt test = ${test} my = ${my}"
+}
+

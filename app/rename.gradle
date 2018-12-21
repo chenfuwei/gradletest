@@ -1,0 +1,145 @@
+ext.preffix = "gs_"
+ext.lines = []
+ext.flag = 0
+ext.regex = "(?:[^g]|(?:g[^s])|(?:gs[^_]))"
+task modifyResources <<{
+    def resDir = file("res")
+    resDir.listFiles().each {
+        File file ->
+            diGuiProcessResFiles(file)
+    }
+
+    def source = file("src/com/gensee")
+    def sourceFiles = files(source.listFiles())
+    sourceFiles.files.each {
+        File file ->
+            diGuiProcessFiles(file)
+    }
+
+    def androidManifestFile = file("AndroidManifest.xml")
+    replaceFileContent(androidManifestFile.parent, androidManifestFile, "@string/")
+    replaceFileContent(androidManifestFile.parent, androidManifestFile, "@drawable/")
+    replaceFileContent(androidManifestFile.parent, androidManifestFile, "@style/")
+}
+
+
+
+void diGuiProcessResFiles(File file)
+{
+    if(file.isDirectory()){
+        file.listFiles().each {
+            diGuiProcessResFiles(it)
+        }
+    }else
+    {
+        replaceFileContent(file.parent, file, "@string/")
+        replaceFileContent(file.parent, file, "@layout/")
+        replaceFileContent(file.parent, file, "@drawable/")
+        replaceFileContent(file.parent, file, "@color/")
+        replaceFileContent(file.parent, file, "@dimen/")
+        replaceFileContent(file.parent, file, "@style/")
+
+
+        File parentFile = new File(file.parent)
+        if(parentFile) {
+            if (parentFile.name.startsWith('drawable') || parentFile.name.startsWith('layout')) {
+                if(!file.name.startsWith("$preffix")) {
+                    file.renameTo(new File(file.parent, "$preffix$file.name"))
+                }
+            }else if(parentFile.name.startsWith('values'))
+            {
+                String fileName = file.name
+                if(fileName == "strings.xml")
+                {
+                    replaceFileContent(file.parent, file, "string name=\"")
+                }else if(fileName == "colors.xml")
+                {
+                    replaceFileContent(file.parent, file, "<color name=\"")
+                }else if(fileName == "dimens.xml")
+                {
+                    replaceFileContent(file.parent, file, "<dimen name=\"")
+                }else if(fileName == "styles.xml")
+                {
+                    replaceFileContent(file.parent, file, "<style name=\"")
+                }else if(fileName == "attrs.xml"){
+
+                    replaceFileContent(file.parent, file, "<declare-styleable name=\"")
+                }
+            }
+        }
+    }
+}
+void diGuiProcessFiles(File file)
+{
+    if(file.isDirectory()){
+        file.listFiles().each {
+            diGuiProcessFiles(it)
+        }
+    }else
+    {
+        replaceFileContent(file.parent, file, "R\\.string\\.")
+        replaceFileContent(file.parent, file, "R\\.layout\\.")
+        replaceFileContent(file.parent, file, "R\\.drawable\\.")
+        replaceFileContent(file.parent, file, "R\\.color\\.")
+        replaceFileContent(file.parent, file, "R\\.dimen\\.")
+        replaceFileContent(file.parent, file, "R\\.style\\.")
+        replaceFileContent(file.parent, file, "R\\.styleable\\.")
+        replaceFileContent(file.parent, file, "ResManager.getDrawableId\\(\"")
+        replaceFileContent(file.parent, file, "ResManager.getColorId\\(\"")
+        replaceFileContent(file.parent, file, "ResManager.getDimenId\\(\"")
+    }
+}
+
+void replaceFileContent(String dir, File file, String preffixString)
+{
+    def regexPreffixString = "$preffixString$regex"
+    def newPreffixString = "$preffixString$preffix"
+
+    String text = file.getText('UTF-8')
+    def matches = [] as Set
+    text.eachMatch(regexPreffixString) {
+        matches.add(it)
+    }
+    if(matches) {
+        File newFile = new File(dir, "tmp.xml")
+        matches.each {
+            String replaceText = it.replaceAll(preffixString, newPreffixString)
+            String regexIt = it.replaceAll("\\(", "\\\\(")
+            text = text.replaceAll(regexIt, replaceText)
+        }
+        newFile.newWriter('UTF-8').withWriter { writer ->
+            writer.write(text)
+        }
+        file.delete()
+        newFile.renameTo(new File(dir, file.name))
+    }
+}
+
+void replaceFileLinesContent(String dir, File file, String preffix, String replacePreffix)
+{
+    lines.clear()
+    flag = 0
+    file.readLines().each {
+        def newLine = it
+        if(it.trim().startsWith(preffix) && !it.trim().startsWith(replacePreffix))
+        {
+            newLine = it.replace(preffix,replacePreffix )
+            println "line content replace = ${newLine}"
+            flag = 1
+        }
+        lines.add(newLine)
+    }
+    if(flag)
+    {
+        File newFile = new File(dir, "tmp.xml")
+        newFile.newWriter('UTF-8').withWriter{writer->
+            lines.each {
+                println "line new content = ${it}"
+                writer.write("$it \n")
+            }
+        }
+
+        file.delete()
+        newFile.renameTo(new File(dir, file.name))
+    }
+}

@@ -1,0 +1,146 @@
+apply plugin: 'com.android.application'
+apply  from : "config.gradle"
+
+//环境参数，结构化参数
+println " env = ${env} "
+def params = new ConfigSlurper(env).parse(file('params.gradle').toURI().toURL())
+println "  env1 = ${env} server = ${params.server} port = ${params.port}"
+
+println " custom = ${params.custom}"
+
+
+//运用groovy文件
+def groovyTest = new GroovyTest()
+groovyTest.name = "hello groovy"
+
+//添加扩展属性
+ext{
+    name = "chen"
+    value = "fuwei"
+}
+android {
+    compileSdkVersion 28
+    defaultConfig {
+        applicationId "com.gradle.test"
+        minSdkVersion 23
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs{
+        config{
+            storeFile new File("$key_store_file")
+            keyAlias "$key_alias"
+            storePassword "$project.key_store_password"
+            keyPassword "$project.key_password"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.config
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    //修改打包目录输出
+    applicationVariants.all{
+        variant -> variant.outputs.each{
+            output ->
+                def outputFile = output.outputFile
+            if(outputFile != null && outputFile.name.endsWith('.apk'))
+            {
+                //variant.packageApplication.outputDirectory   = new File("F:\\b", "aaaa.apk")
+            }
+        }
+
+    }
+}
+
+//COPY文件
+task copyFile(type: Copy){
+    print "copy test a"
+    from "F:\\a"
+    into "F:\\b"
+    include "*.png"
+}
+
+//打包文件
+task zipFile(type: Zip){
+    from "F:\\a"
+    into "src"
+    baseName = "custom"
+    version = "1.0"
+    destinationDir = file("F:\\b")
+}
+
+//编辑properties文件
+task editProperties<<{
+    Properties properties = new Properties()
+    def versionFile = file("version.properties")
+    versionFile.withInputStream {stream ->
+        properties.load(stream)
+        print "helloWorold properties ${properties.major} ${properties.minor}"
+
+        properties.setProperty("major", "1001")
+        properties.setProperty("minor", "5000")
+        properties.store(versionFile.newWriter(), "test")
+    }
+}
+
+task testTask << {
+    println "$rootDir"
+}
+
+
+def groovyVersion = new GroovyVersion()
+groovyVersion.minor = 1
+groovyVersion.major = 3
+
+def code1 = new Code()
+code1.versionCode = 11
+
+//自定义TASK，增强型task
+task groovyTask(type : GroovyTask){
+    version = groovyVersion
+    code = code1
+}
+
+//dependsOn：依赖
+task testBuild(dependsOn: testExt) << {
+    println "testBuiild $test $my"
+}
+
+//复制release包，并重新命名
+task copyAndRenameReleaseApk(dependsOn: "assembleRelease")<<{
+    copy {
+        from "./build/outputs/apk/release/app-release.apk"
+        into "$project.destDir"
+        rename {
+            Properties properties = new Properties()
+            def versionFile = file("version.properties")
+            versionFile.withInputStream { stream ->
+                properties.load(stream)
+            }
+            def newName = "app-${properties.major}-${properties.minor}.apk"
+
+            properties.minor  = (Integer.parseInt(properties.minor) + 1).toString()
+            properties.store(versionFile.newWriter(), "")
+
+            newName
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+
+}

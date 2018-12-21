@@ -1,0 +1,4 @@
+
+class GroovyTest{
+    def name
+}
