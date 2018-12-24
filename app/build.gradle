@@ -1,6 +1,7 @@
 apply plugin: 'com.android.application'
-apply  from : "config.gradle"
+apply from: "config.gradle"
 
+def env = project.hasProperty('env') ? project.env : "test"
 //环境参数，结构化参数
 println " env = ${env} "
 def params = new ConfigSlurper(env).parse(file('params.gradle').toURI().toURL())
@@ -8,13 +9,12 @@ println "  env1 = ${env} server = ${params.server} port = ${params.port}"
 
 println " custom = ${params.custom}"
 
-
 //运用groovy文件
 def groovyTest = new GroovyTest()
 groovyTest.name = "hello groovy"
 
 //添加扩展属性
-ext{
+ext {
     name = "chen"
     value = "fuwei"
 }
@@ -29,8 +29,8 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs{
-        config{
+    signingConfigs {
+        config {
             storeFile new File("$key_store_file")
             keyAlias "$key_alias"
             storePassword "$project.key_store_password"
@@ -43,25 +43,69 @@ android {
             signingConfig signingConfigs.config
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "testName", "\"chenfuwei-release\""
+            resValue "string", "testRes", "chenfuwei-release"
+            resValue "dimen", "testDimen", "30dp"
+            resValue "drawable", "testDrawable", "@drawable/loading1"
+        }
+
+        debug {
+            buildConfigField "String", "testName", "\"chenfuwei-debug\""
+            resValue "string", "testRes", "chenfuwei-debug"
+            resValue "dimen", "testDimen", "30dp"
+            resValue "drawable", "testDrawable", "@drawable/loading1"
+        }
+
+        stage.initWith(debug)
+        stage {
+            buildConfigField "String", "testName", "\"chenfuwei-stage\""
+            resValue "string", "testRes", "chenfuwei-stage"
+            resValue "dimen", "testDimen", "30dp"
+            resValue "drawable", "testDrawable", "@drawable/loading1"
+        }
+
+    }
+
+    flavorDimensions "one", "two"
+    productFlavors {
+        first {
+            applicationId "com.first.name"
+            resValue "string", "app_name", "first"
+            resValue "drawable", "ic_launcher", "@drawable/loading1"
+            dimension "one"
+        }
+        second {
+            applicationId "com.second.name"
+            resValue "string", "app_name", "second"
+            resValue "drawable", "ic_launcher", "@drawable/kk"
+            dimension "one"
+        }
+
+        one {
+            dimension "two"
+        }
+        two {
+            dimension "two"
         }
     }
 
     //修改打包目录输出
-    applicationVariants.all{
-        variant -> variant.outputs.each{
-            output ->
-                def outputFile = output.outputFile
-            if(outputFile != null && outputFile.name.endsWith('.apk'))
-            {
-                //variant.packageApplication.outputDirectory   = new File("F:\\b", "aaaa.apk")
+    applicationVariants.all {
+        variant ->
+            println "variant name= ${variant.name} versionCode=${variant.versionCode} applicationid=${variant.applicationId}"
+            variant.outputs.each {
+                output ->
+                    def outputFile = output.outputFile
+                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+                        //variant.packageApplication.outputDirectory   = new File("F:\\b", "aaaa.apk")
+                    }
             }
-        }
 
     }
 }
 
 //COPY文件
-task copyFile(type: Copy){
+task copyFile(type: Copy) {
     print "copy test a"
     from "F:\\a"
     into "F:\\b"
@@ -69,7 +113,7 @@ task copyFile(type: Copy){
 }
 
 //打包文件
-task zipFile(type: Zip){
+task zipFile(type: Zip) {
     from "F:\\a"
     into "src"
     baseName = "custom"
@@ -78,10 +122,10 @@ task zipFile(type: Zip){
 }
 
 //编辑properties文件
-task editProperties<<{
+task editProperties << {
     Properties properties = new Properties()
     def versionFile = file("version.properties")
-    versionFile.withInputStream {stream ->
+    versionFile.withInputStream { stream ->
         properties.load(stream)
         print "helloWorold properties ${properties.major} ${properties.minor}"
 
@@ -104,7 +148,7 @@ def code1 = new Code()
 code1.versionCode = 11
 
 //自定义TASK，增强型task
-task groovyTask(type : GroovyTask){
+task groovyTask(type: GroovyTask) {
     version = groovyVersion
     code = code1
 }
@@ -115,7 +159,7 @@ task testBuild(dependsOn: testExt) << {
 }
 
 //复制release包，并重新命名
-task copyAndRenameReleaseApk(dependsOn: "assembleRelease")<<{
+task copyAndRenameReleaseApk(dependsOn: "assembleRelease") << {
     copy {
         from "./build/outputs/apk/release/app-release.apk"
         into "$project.destDir"
@@ -127,7 +171,7 @@ task copyAndRenameReleaseApk(dependsOn: "assembleRelease")<<{
             }
             def newName = "app-${properties.major}-${properties.minor}.apk"
 
-            properties.minor  = (Integer.parseInt(properties.minor) + 1).toString()
+            properties.minor = (Integer.parseInt(properties.minor) + 1).toString()
             properties.store(versionFile.newWriter(), "")
 
             newName
